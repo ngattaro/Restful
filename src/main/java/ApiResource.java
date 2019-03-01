@@ -4,6 +4,8 @@ import javax.ws.rs.core.MediaType;
 
 import Model.Employee;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
 import javax.ws.rs.core.Response;
 import java.sql.*;
 import java.util.ArrayList;
@@ -12,7 +14,6 @@ import java.util.List;
 @Path("/api")
 @Produces(MediaType.APPLICATION_JSON)
 public class ApiResource {
-    private static int countAddEmployee = 0;
     PreparedStatement statement = null;
     Connection connection = ConnectionUtils.getMyConnection();
 
@@ -70,22 +71,27 @@ public class ApiResource {
     public Response createEmployee(String data) throws SQLException, ClassNotFoundException
     {
         String sql = "insert into Employee (Emp_Id, Emp_No, Emp_Name) values (?,?,?)";
-        System.out.println(data);
         statement = connection.prepareStatement(sql);
         //convert json -> java object
         Gson g = new Gson();
-        Employee employee = g.fromJson(data, Employee.class);
-
-        statement.setInt(1, employee.getId());
-        statement.setString(2,employee.getNo());
-        statement.setString(3,employee.getName());
-
-
-        statement.addBatch();
-        statement.executeBatch();
-
-        connection.commit();
-
+        //Employee employee = g.fromJson(data, Employee.class);
+        TypeToken<List<Employee>> token = new TypeToken<List<Employee>>(){};
+        List<Employee> employeeList = g.fromJson(data, token.getType());
+        int countBatch = 0;
+        for(Employee employee : employeeList)
+        {
+            statement.setInt(1, employee.getId());
+            statement.setString(2, employee.getNo());
+            statement.setString(3, employee.getName());
+            statement.addBatch();
+            countBatch++;
+            if(countBatch == 20)
+            {
+                statement.executeBatch();
+                connection.commit();
+                countBatch = 0;
+            }
+        }
         return Response.ok(data).build();
     }
     @PUT
