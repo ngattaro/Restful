@@ -3,6 +3,7 @@ import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 
 import Model.Employee;
+import Model.User;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -10,6 +11,8 @@ import javax.ws.rs.core.Response;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 
 @Path("/api")
 @Produces(MediaType.APPLICATION_JSON)
@@ -71,6 +74,7 @@ public class ApiResource {
     public Response createEmployee(String data) throws SQLException, ClassNotFoundException
     {
         String sql = "insert into Employee (Emp_Id, Emp_No, Emp_Name) values (?,?,?)";
+
         statement = connection.prepareStatement(sql);
         //convert json -> java object
         Gson g = new Gson();
@@ -92,6 +96,32 @@ public class ApiResource {
                 countBatch = 0;
             }
         }
+        statement.executeBatch();
+        connection.commit();
+        return Response.ok(data).build();
+    }
+    @POST
+    @Path("/createUser")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response createUser(String data) throws SQLException
+    {
+
+        //convert json -> java object
+        Gson g = new Gson();
+        TypeToken<List<User>> token = new TypeToken<List<User>>(){};
+        List<User> userList = g.fromJson(data, token.getType());
+        ArrayBlockingQueue<User> sharedQueue = new ArrayBlockingQueue<User>(1000);
+        for(User user : userList) sharedQueue.add(user);
+        Thread consThread = new Thread(new Consumer(sharedQueue));
+        Thread consThread1 = new Thread(new Consumer(sharedQueue));
+        Thread consThread2 = new Thread(new Consumer(sharedQueue));
+        Thread consThread3 = new Thread(new Consumer(sharedQueue));
+
+        //Starting producer and Consumer thread
+        consThread.start();
+        consThread1.start();
+        consThread2.start();
+        consThread3.start();
         return Response.ok(data).build();
     }
     @PUT
